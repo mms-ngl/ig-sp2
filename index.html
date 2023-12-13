@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+	<style>
+		.parent {
+			text-align: left;
+		}
+
+		.child {
+			display: inline-block;
+			padding: 1rem 1rem;
+			vertical-align: middle;
+		}
+
+		.button {
+			background-color: #4CAF50; 
+			border: none;
+			color: white;
+			padding: 15px 32px;
+			text-align: center;
+			text-decoration: none;
+			display: inline-block;
+			font-size: 16px;
+		}
+
+		.slider {
+			-webkit-appearance: none;
+			width: 100%;
+			height: 15px;
+			border-radius: 5px;
+			background: #d3d3d3; 
+			outline: none;
+			opacity: 0.7;
+			-webkit-transition: .2s;
+			transition: opacity .2s;
+		}
+	</style>
+
+<script id="vertex-shader" type="x-shader/x-vertex">
+#version 300 es
+
+uniform mat4 projectionMatrix;
+uniform mat4 modelViewMatrix;
+uniform mat3 uNormalMatrix;
+uniform vec4 uLightPosition;
+
+in vec3 aNormal;
+in vec3 aTangent;
+in vec4 aPosition;
+in vec2 aTexCoord;
+
+out vec2 vTexCoord;
+
+out vec3 N;
+out vec3 L; /* light vector in texture-space coordinates */
+out vec3 V; /* view vector in texture-space coordinates */
+
+void main()
+{
+	gl_Position = projectionMatrix * modelViewMatrix * aPosition;
+	 
+	vTexCoord = aTexCoord;
+
+		vec3 eyePosition = (modelViewMatrix*aPosition).xyz;
+		vec3 eyeLightPos = (modelViewMatrix*uLightPosition).xyz;
+
+	 /* normal, tangent and binormal in eye coordinates */
+		N = normalize(uNormalMatrix*aNormal.xyz);
+		vec3 T  = normalize(uNormalMatrix*aTangent);
+		vec3 B = cross(N, T);
+
+		/* light vector in texture space */
+		L.x = dot(T, eyeLightPos-eyePosition);
+		L.y = dot(B, eyeLightPos-eyePosition);
+		L.z = dot(N, eyeLightPos-eyePosition);
+
+		L = normalize(L);
+}
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+#version 300 es
+
+precision mediump float;
+
+in vec3 N;
+in vec3 L;
+//in vec3 V;
+in vec2 vTexCoord;
+
+uniform sampler2D uTexture_carpet;
+uniform sampler2D uTexture_table;
+uniform sampler2D uTexture_body;
+uniform sampler2D uTexture_face;
+
+uniform sampler2D uTextureMap;
+
+uniform vec4 uDiffuseProduct;
+
+uniform bool textureCarpet;
+uniform bool textureTable;
+uniform bool textureBody;
+uniform bool textureHead;
+uniform bool textureHeadFront;
+
+out vec4 fColor;
+
+vec4 bump_texture() {
+	vec4 N = texture(uTextureMap, vTexCoord);
+	vec3 NN = normalize(2.0*N.xyz-1.0);
+	vec3 LL = normalize(L);
+	float Kd = max(dot(NN, LL), 0.0);
+	return vec4(Kd*uDiffuseProduct.xyz, 1.0);
+}
+
+void main()
+{	 
+	vec4 bump_texture = bump_texture();
+
+	float Kd = max(dot(L, N), 0.0);
+	vec4 diffuse = Kd*uDiffuseProduct;
+
+	if (textureCarpet == true) {
+
+		fColor = bump_texture + texture(uTexture_carpet, vTexCoord);
+	}
+	else if (textureBody == true || textureHead == true) {
+
+		fColor = bump_texture + texture(uTexture_body, vTexCoord);
+	}
+	else if (textureHeadFront == true) {
+
+		fColor = texture(uTexture_face, vTexCoord);
+	}
+	else if (textureTable == true){
+
+		fColor = texture(uTexture_table, vTexCoord);
+	}
+	
+	fColor.a = 1.0;
+}
+</script>
+
+<script src="./common/initShaders.js"></script>
+<script src="./common/MVnew.js"></script>
+<script src="main.js"></script>
+<img id = "carpet" src = "./assets/carpet.png" hidden></img>
+<img id = "table" src = "./assets/table.jpg" hidden></img>
+<img id = "fur" src = "./assets/fur.png" hidden></img>
+<img id = "face" src = "./assets/face.png" hidden></img>
+
+<div class="parent">
+	<div class="child">
+		<button id= "animation" class="button">Animation</button>
+	</div>
+		<div class="child">
+			<div>
+			radius: 0.05
+			<input id="radiusSlider" type="range" min="0.05" max="10" step="1" value="0.05" />
+			10
+		</div>
+
+		<div>
+			theta: -180
+			<input id="thetaSlider" type="range" min="-180" max="180" step="5" value="-40" />
+			180
+		</div>
+
+		<div>
+			phi: -180
+			<input id="phiSlider" type="range" min="-180" max="180" step="5" value="-30" />
+			180
+		</div>
+	</div>
+</div>
+
+<body>
+	<canvas id="gl-canvas" width="896" height="896"></canvas>
+</canvas>
+</body>
+</html>
